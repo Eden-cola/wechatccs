@@ -41,5 +41,6 @@ func main() {
 	})
 	e.GET("/token", getToken)
 	e.GET("/ticket", getTicket)
+	fmt.Println("listen:2266")
 	e.Run(standard.New(":2266"))
 }
