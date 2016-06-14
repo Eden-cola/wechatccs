@@ -37,6 +37,16 @@ func (s saveStruct) ToJson() jsonStruct {
 	return jsonStruct{s.AccessToken, s.ExpiresIn()}
 }
 
+func (s saveStruct) update(url string, jsonS jsonStruct) error {
+	fmt.Println("update")
+	jsonStr := httpGet(url)
+	err := json.Unmarshal([]byte(jsonStr), &jsonS)
+	if err == nil {
+		s = jsonS.ToSave()
+	}
+	return err
+}
+
 func (j jsonStruct) ExpiresTime() int {
 	timeStamp := time.Now().Unix()
 	return j.ExpiresIn + int(timeStamp)
@@ -51,17 +61,9 @@ func init() {
 }
 
 func httpGet(url string) string {
-	resp, err := http.Get(url)
-	if err != nil {
-		// handle error
-	}
-
+	resp, _ := http.Get(url)
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		// handle error
-	}
-
+	body, _ := ioutil.ReadAll(resp.Body)
 	return string(body)
 }
 
@@ -75,25 +77,12 @@ func get(appID, appsecret string) (saveStruct, error) {
 	if v, ok := saveList[key]; ok && v.Check() {
 		return v, nil
 	} else {
-		s, err := update(appID, appsecret)
-		if err != nil {
-			return saveStruct{}, err
-		} else {
-			saveList[key] = s
-			return s, nil
+		err := v.update(getUrl(appID, appsecret), jsonStruct{})
+		fmt.Printf("%+v\n", v)
+		if err == nil {
+			saveList[key] = v
 		}
-	}
-}
-
-func update(appID, appsecret string) (saveStruct, error) {
-	fmt.Println("update access_token")
-	url := getUrl(appID, appsecret)
-	jsonStr := httpGet(url)
-	var data jsonStruct
-	if err := json.Unmarshal([]byte(jsonStr), &data); err == nil {
-		return data.ToSave(), nil
-	} else {
-		return saveStruct{}, err
+		return v, err
 	}
 }
 

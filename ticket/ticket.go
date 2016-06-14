@@ -2,7 +2,6 @@ package ticket
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -53,6 +52,16 @@ func (s saveStruct) ExpiresIn() int {
 	return s.ExpiresTime - int(timeStamp)
 }
 
+func (s saveStruct) update(url string, jsonS jsonStruct) error {
+	//fmt.Println("update access_token")
+	jsonStr := httpGet(url)
+	err := json.Unmarshal([]byte(jsonStr), &jsonS)
+	if err == nil {
+		s = jsonS.ToSave()
+	}
+	return err
+}
+
 func init() {
 	saveList = make(map[string]saveStruct)
 }
@@ -81,25 +90,11 @@ func get(accessToken string) (saveStruct, error) {
 	if v, ok := saveList[accessToken]; ok && v.Check() {
 		return v, nil
 	} else {
-		s, err := update(accessToken)
-		if err != nil {
-			return saveStruct{}, err
-		} else {
-			saveList[accessToken] = s
-			return s, nil
+		err := v.update(getUrl(accessToken), jsonStruct{})
+		if err == nil {
+			saveList[accessToken] = v
 		}
-	}
-}
-
-func update(accessToken string) (saveStruct, error) {
-	fmt.Println("update ticket")
-	url := getUrl(accessToken)
-	jsonStr := httpGet(url)
-	var data jsonStruct
-	if err := json.Unmarshal([]byte(jsonStr), &data); err == nil {
-		return data.ToSave(), nil
-	} else {
-		return saveStruct{}, err
+		return v, err
 	}
 }
 
