@@ -19,6 +19,7 @@ type saveStruct struct {
 }
 
 var saveList map[[16]byte]saveStruct
+var jsonMap map[string]interface{}
 
 func (s saveStruct) Check() bool {
 	timeStamp := time.Now().Unix()
@@ -33,38 +34,31 @@ func (s saveStruct) ExpiresIn() int {
 	return s.ExpiresTime - int(timeStamp)
 }
 
-func (s saveStruct) ToJson() jsonStruct {
-	return jsonStruct{s.AccessToken, s.ExpiresIn()}
-}
-
-func (s saveStruct) update(url string, jsonS jsonStruct) error {
-	fmt.Println("update")
-	jsonStr := httpGet(url)
-	err := json.Unmarshal([]byte(jsonStr), &jsonS)
+func (s *saveStruct) update(url string) error {
+	jsonM := jsonMap
+	jsonStr := s.httpGet(url)
+	err := json.Unmarshal([]byte(jsonStr), &jsonM)
 	if err == nil {
-		s = jsonS.ToSave()
+		s.load(jsonM)
 	}
+	//fmt.Printf("result: %+v\n", s)
 	return err
 }
 
-func (j jsonStruct) ExpiresTime() int {
-	timeStamp := time.Now().Unix()
-	return j.ExpiresIn + int(timeStamp)
+func (s *saveStruct) load(jsonM map[string]interface{}) {
+	s.AccessToken = jsonM["access_token"].(string)
+	s.ExpiresTime = int(jsonM["expires_in"].(float64)) + int(time.Now().Unix())
 }
 
-func (j jsonStruct) ToSave() saveStruct {
-	return saveStruct{j.AccessToken, j.ExpiresTime()}
-}
-
-func init() {
-	saveList = make(map[[16]byte]saveStruct)
-}
-
-func httpGet(url string) string {
+func (s saveStruct) httpGet(url string) string {
 	resp, _ := http.Get(url)
 	defer resp.Body.Close()
 	body, _ := ioutil.ReadAll(resp.Body)
 	return string(body)
+}
+
+func init() {
+	saveList = make(map[[16]byte]saveStruct)
 }
 
 func getUrl(appID, appsecret string) string {
@@ -77,7 +71,7 @@ func get(appID, appsecret string) (saveStruct, error) {
 	if v, ok := saveList[key]; ok && v.Check() {
 		return v, nil
 	} else {
-		err := v.update(getUrl(appID, appsecret), jsonStruct{})
+		err := v.update(getUrl(appID, appsecret))
 		fmt.Printf("%+v\n", v)
 		if err == nil {
 			saveList[key] = v
@@ -87,9 +81,9 @@ func get(appID, appsecret string) (saveStruct, error) {
 }
 
 func Get(appID, appsecret string) (jsonStruct, error) {
-	accessToken, err := get(appID, appsecret)
+	a_t, err := get(appID, appsecret)
 	if err != nil {
 		return jsonStruct{}, err
 	}
-	return accessToken.ToJson(), nil
+	return jsonStruct{a_t.AccessToken, a_t.ExpiresIn()}, nil
 }
