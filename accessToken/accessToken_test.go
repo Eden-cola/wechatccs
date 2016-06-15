@@ -16,6 +16,7 @@ func TestGet(t *testing.T) {
 	if data.AccessToken == "" {
 		t.Errorf("未获取到accessToken")
 	}
-	t.Errorf("查看结果")
-	fmt.Println(data)
+	if data.ExpiresIn != 7200 {
+		t.Errorf("过期时间不正确")
+	}
 }
