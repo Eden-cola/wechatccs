@@ -5,6 +5,7 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/engine/standard"
 	"net/http"
+	"time"
 	"wechatccs/accessToken"
 	"wechatccs/ticket"
 )
@@ -32,6 +33,24 @@ func getTicket(c echo.Context) error {
 	}
 }
 
+func tokenChecker() {
+	lastIn := accessToken.ExpiresIn
+	for {
+		fmt.Printf("token last check at %d\n", lastIn)
+		time.Sleep(time.Second * time.Duration(lastIn))
+		lastIn = accessToken.Check()
+	}
+}
+
+func ticketChecker() {
+	lastIn := ticket.ExpiresIn
+	for {
+		fmt.Printf("ticket last check at %d\n", lastIn)
+		time.Sleep(time.Second * time.Duration(lastIn))
+		lastIn = ticket.Check()
+	}
+}
+
 func main() {
 	e := echo.New()
 	e.GET("/", func(c echo.Context) error {
@@ -42,5 +61,7 @@ func main() {
 	e.GET("/token", getToken)
 	e.GET("/ticket", getTicket)
 	fmt.Println("listen:2266")
+	go ticketChecker()
+	go tokenChecker()
 	e.Run(standard.New(":2266"))
 }

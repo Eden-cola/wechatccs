@@ -2,9 +2,14 @@ package ticket
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
+)
+
+const (
+	ExpiresIn int = 7200
 )
 
 type jsonStruct struct {
@@ -39,6 +44,10 @@ func (s saveStruct) ToResult() resultStruct {
 	return resultStruct{s.Ticket, s.ExpiresIn()}
 }
 
+func (s saveStruct) ToJson() jsonStruct {
+	return jsonStruct{0, "", s.Ticket, s.ExpiresIn()}
+}
+
 func (s saveStruct) Check() bool {
 	timeStamp := time.Now().Unix()
 	if s.ExpiresTime > int(timeStamp) {
@@ -52,32 +61,29 @@ func (s saveStruct) ExpiresIn() int {
 	return s.ExpiresTime - int(timeStamp)
 }
 
-func (s saveStruct) update(url string, jsonS jsonStruct) error {
+func (s *saveStruct) update(url string, jsonS jsonStruct) error {
 	//fmt.Println("update access_token")
-	jsonStr := httpGet(url)
+	jsonStr := s.httpGet(url)
 	err := json.Unmarshal([]byte(jsonStr), &jsonS)
 	if err == nil {
-		s = jsonS.ToSave()
+		s.load(jsonS)
 	}
 	return err
+}
+
+func (s *saveStruct) load(jsonS jsonStruct) {
+	s.Ticket = jsonS.Ticket
+	s.ExpiresTime = jsonS.ExpiresIn + int(time.Now().Unix())
 }
 
 func init() {
 	saveList = make(map[string]saveStruct)
 }
 
-func httpGet(url string) string {
-	resp, err := http.Get(url)
-	if err != nil {
-		// handle error
-	}
-
+func (s saveStruct) httpGet(url string) string {
+	resp, _ := http.Get(url)
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		// handle error
-	}
-
+	body, _ := ioutil.ReadAll(resp.Body)
 	return string(body)
 }
 
@@ -98,10 +104,27 @@ func get(accessToken string) (saveStruct, error) {
 	}
 }
 
-func Get(accessToken string) (resultStruct, error) {
+func Get(accessToken string) (jsonStruct, error) {
 	ticket, err := get(accessToken)
 	if err != nil {
-		return resultStruct{}, err
+		return jsonStruct{}, err
 	}
-	return ticket.ToResult(), nil
+	return ticket.ToJson(), nil
+}
+
+//检查存储map，清理过期的ticket,返回多少秒后应该进行下一次检查
+func Check() int {
+	fmt.Println("ticket check")
+	firstIn := ExpiresIn //第一个将要过期的时间
+	for key, value := range saveList {
+		ei := value.ExpiresIn()
+		if ei < 1 {
+			delete(saveList, key)
+		} else {
+			if ei < firstIn {
+				firstIn = ei
+			}
+		}
+	}
+	return firstIn
 }
